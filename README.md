@@ -38,7 +38,7 @@ var curtain.search('my search').
 The `results` object consists of two keys, namely: `show` and `termlist`
 
 Example of `show` object:
-```
+```javascript
 { 
     'status': 'OK',
     'activeclients': 0,
@@ -77,7 +77,7 @@ Example of `show` object:
 ```
 
 Example of `termlist` object:
-```
+```javascript
 { 
     'subject': [ 
         { 'Ποίηση': 1 }, 
