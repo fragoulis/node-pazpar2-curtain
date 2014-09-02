@@ -1,7 +1,7 @@
 pazpar2-curtain
 ============
 
-A wrapper for the `pazpar2` client with a simple interface.
+A wrapper for the [`pazpar2`](https://github.com/jfragoulis/node-pazpar2) client with a simple interface.
 
 ## Installation
 
