@@ -12,7 +12,7 @@ A wrapper for the [`pazpar2`](https://github.com/jfragoulis/node-pazpar2) client
 Initialize the connection by either requesting a new session which you can read later by doing `curtain.session` or by passing an old session.
 
 ```javascript
-var pz2 = require('pazpar2-curtain');
+var Curtain = require('pazpar2-curtain');
 
 var curtain = new Curtain({
     // session: old session,
