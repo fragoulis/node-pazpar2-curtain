@@ -9,6 +9,8 @@ A wrapper for the [`pazpar2`](https://github.com/jfragoulis/node-pazpar2) client
 
 ## Usage
 
+### init
+
 Initialize the connection by either requesting a new session which you can read later by doing `curtain.session` or by passing an old session.
 
 ```javascript
@@ -19,6 +21,8 @@ var curtain = new Curtain({
     terms: ['subject', 'author']
 });
 ```
+
+### search
 
 Perform a search and optionally provide an error and a progress callbacks.
 
@@ -87,6 +91,14 @@ Example of `termlist` object:
         { 'Σπαντίδου, Κωνσταντίνα': 1 } 
     ] 
 }
+```
+
+### record
+
+```javascript
+curtain.record(id).then(function(marcxml) {
+     
+});
 ```
 
 ## Tests

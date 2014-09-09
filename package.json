@@ -1,6 +1,6 @@
 {
   "name": "pazpar2-curtain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pazpar2 client wrapper",
   "main": "index.js",
   "scripts": {

@@ -3,12 +3,13 @@ var assert = require('assert');
 
 describe('Curtain', function() {
 
-  var curtain;
+  var curtain = new Curtain();
 
   it('initializes the connection', function(done) {
-    curtain = new Curtain({
-      session: '90668034',
+    curtain.init({
+      session: '246404645',
       terms: ['subject', 'author_070'],
+      safe: true
     });
 
     done();

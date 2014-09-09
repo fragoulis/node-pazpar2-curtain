@@ -93,13 +93,16 @@ var TermListObject = function(result) {
     var termName = result.termlist.list[idx].$.name
       , items = result.termlist.list[idx].term;
 
-    this[termName] = [];
+    this[termName] = {
+      type: termName,
+      terms: []
+    };
+
     for(var idxItem in items) {
-
-      var item = {};
-      item[items[idxItem].name[0]] = parseInt(items[idxItem].frequency[0]);
-
-      this[termName].push(item);
+      this[termName].terms.push({
+        name: items[idxItem].name[0],
+        freq: parseInt(items[idxItem].frequency[0])
+      });
     }
   }
 }
@@ -117,18 +120,31 @@ var TermListObject = function(result) {
 var Curtain = function(options) {
   options = options || {};
 
+  this.pingInterval = 5000;
   this.statInterval = new Interval(options.statInterval || 1000);
   this.showInterval = new Interval(options.showInterval || 1000);
   this.termlistInterval = new Interval(options.termlistInterval || 1000);
   this.searching = false;
+};
+
+/**
+ * [init description]
+ * @param  {[type]} options [description]
+ * @return {[type]}         [description]
+ */
+Curtain.prototype.init = function(options) {
+  options = options || {};
 
   this.pz2 = new Pazpar2({
     session: options.session || null,
     terms: options.terms || null
   });
 
-  this.pz2.safeInit();
-}
+  if (options.safe)
+    return this.pz2.safeInit();
+
+  return this.pz2.init();
+};
 
 /**
  * Calls the stat command every X seconds until the server
@@ -143,12 +159,16 @@ var promiseStat = function(progress) {
     self.statInterval.begin(function() {
       
       self.pz2.stat().then(function(result) {
-        progress(result.stat);
-        if (result.stat.working == 0) {
+        var stat = new StatObject(result.stat);
+        progress(stat);
+        if (stat.working == 0) {
           self.statInterval.end();          
-          resolve(new StatObject(result.stat));
+          resolve(stat);
         }
-      }, reject);
+      }, function(err) {
+        console.log('promiseStat');
+        reject(err);
+      });
 
     });
 
@@ -170,7 +190,10 @@ var promiseShow = function() {
           self.showInterval.end();
           resolve(new ShowObject(result.show));
         }
-      }, reject);
+      }, function(err) {
+        console.log('promiseShow');
+        reject(err);
+      });
 
     });
 
@@ -192,7 +215,10 @@ var promiseTermlist = function() {
           self.termlistInterval.end();
           resolve(new TermListObject(result));
         }
-      }, reject);
+      }, function(err) {
+        console.log('promiseTermlist');
+        reject(err);
+      });
 
     });
 
@@ -244,6 +270,21 @@ Curtain.prototype.search = function(ccl, filter) {
         }, reject);
 
       }, reject);
+  });
+}
+
+/**
+ * [record description]
+ * @param  {[type]} id     [description]
+ * @param  {[type]} offset [description]
+ * @return {[type]}        [description]
+ */
+Curtain.prototype.record = function(id, offset) {
+  var self = this;
+
+  return q.Promise(function(resolve, reject) {
+    return self.pz2.record(id, offset)
+      .then(resolve, reject);
   });
 }
 
