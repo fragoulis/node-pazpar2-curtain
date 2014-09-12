@@ -233,7 +233,7 @@ var safeInit = function()
     isSessionValid.call(self).then(function(isValid) {
 
       if (isValid) {
-        resolve();
+        resolve(self.session);
       } else {
         return innerInit.call(self).then(resolve, reject);
       }
