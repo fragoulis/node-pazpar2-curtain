@@ -375,7 +375,7 @@ var promiseTermlist = function(terms)
 
     self.termlistInterval.begin(function() {
       
-      self.pz2.termlist(self.session).then(function(result) {
+      self.pz2.termlist(self.session, terms).then(function(result) {
 
         parseXmlResponse(result, function(data) {
           if (data.termlist.activeclients == 0) {
@@ -431,7 +431,7 @@ Curtain.prototype.searchOnly = function(ccl, filter)
  *
  * @return {Promise} [description]
  */
-Curtain.prototype.search = function(ccl, filter, terms) 
+Curtain.prototype.search = function(ccl, terms, filter) 
 {
   var self = this;
   return q.Promise(function(resolve, reject, progress) {
