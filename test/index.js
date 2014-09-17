@@ -64,7 +64,7 @@ describe('Curtain', function() {
   
   it('loads a record', function(done) {
 
-    curtain.getRecord(35131)
+    curtain.getRecord(35130)
       .then(function(record) {
         console.log(record);
         done();

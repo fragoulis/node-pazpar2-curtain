@@ -549,7 +549,7 @@ Curtain.prototype.getRecord = function(id, filter)
           .then(function(stat) {
 
             if (stat.hits === 0) { // 404 record not found
-              reject({code: 404, msg: 'Record not found', session: self.session});
+              reject({code: Curtain.ERR_MISSING_RECORD, msg: 'Record not found', session: self.session});
             } else { // fetch record
 
               // Query for the plain record
