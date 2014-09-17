@@ -188,6 +188,7 @@ var parseXmlResponse = function(result, callback, errorCallback)
     if (err) { // XML parsing error
       throw new Error(err);
     } else if(data.error) { // Pazpar2 error
+      console.log('Finished parsing');
       if (errorCallback) {
         errorCallback(parseInt(data.error.$.code), data.error.$.msg);
       }
@@ -509,21 +510,18 @@ Curtain.prototype.record = function(id, offset)
     return self.pz2.record(self.session, 'content: ' + id, offset)
       .then(function(result) {
 
+
         if (offset === undefined) {
           parseXmlResponse(result, function(data) {
-            // console.log(data);
             resolve(data);
           }, RejectCb(reject, self));
         } else {
-          // console.log(result.toString());
           resolve(result);
         }
 
       }, reject);
   });
 };
-
-
 
 var Reject = function(reject, code, msg, session)
 {
@@ -565,31 +563,29 @@ Curtain.prototype.getRecord = function(id, filter)
 
             if (stat.hits === 0) { // 404 record not found
               Reject(reject, Curtain.ERR_MISSING_RECORD, 'Record not found', self.session);
-              // reject({code: Curtain.ERR_MISSING_RECORD, msg: 'Record not found', session: self.session});
             } else { // fetch record
-
               // Query for the plain record
               self.record(id).then(function(result) {
 
-                  // Create the record object
-                  var recordObject = new RecordObject(result);
+                // Create the record object
+                var recordObject = new RecordObject(result);
 
-                  // Create an array of asyncronous calls to be made 
-                  // one for each location
-                  var promises = [];
-                  for (var i=0; i<recordObject.holdings.length; i++) {
-                    promises.push(self.record(id, i));
+                // Create an array of asyncronous calls to be made 
+                // one for each location
+                var promises = [];
+                for (var i=0; i<recordObject.holdings.length; i++) {
+                  promises.push(self.record(id, i));
+                }
+
+                // Fetch marcxml from all the different locations
+                q.all(promises).then(function(marcxml) {
+                  for (var i in marcxml) {
+                    recordObject.holdings[i].marcxml = marcxml[i].toString();
                   }
+                  resolve(recordObject);
+                });
 
-                  // Fetch marcxml from all the different locations
-                  q.all(promises).then(function(marcxml) {
-                    for (var i in marcxml) {
-                      recordObject.holdings[i].marcxml = marcxml[i].toString();
-                    }
-                    resolve(recordObject);
-                  });
-
-                }, RejectCb(reject, self));
+              }, RejectCb(reject, self));
 
             }
 
