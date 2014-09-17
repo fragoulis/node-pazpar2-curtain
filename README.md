@@ -96,9 +96,30 @@ Example of `termlist` object:
 ### record
 
 ```javascript
-curtain.record(id).then(function(marcxml) {
+curtain.getRecord(id).then(function(record) {
      
 });
+```
+
+Example of `record` object:
+```javascript
+{ 
+    'recid': 35131,
+    'authors': [ 'Lacy, George' ],
+    'publishers': [ 'Sonnenschein. Swan' ],
+    'title': 'Liberty and law / George Lacy. --London : Swan sonnenschein : 1888',
+    'year': '1888',
+    'holdings': [ 
+        { 
+            'meta': {},
+            'digital': [],
+            'rectype': 'a',
+            'biblevel': 'm',
+            'subjects': [],
+            'marcxml': ''
+        }
+    ]
+}
 ```
 
 ## Tests

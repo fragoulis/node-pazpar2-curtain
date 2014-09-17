@@ -64,13 +64,11 @@ describe('Curtain', function() {
   
   it('loads a record', function(done) {
 
-    curtain.searchOnly('ti=saint').then(function() {
-      curtain.record('content: 9930')
-        .then(function(record) {
-          // console.log(record);
-          done();
-        }, errorHandler(done));
-    }, errorHandler(done));
+    curtain.getRecord(35131)
+      .then(function(record) {
+        console.log(record);
+        done();
+      }, errorHandler(done));
     
   });
 });

@@ -113,6 +113,42 @@ var TermListObject = function(result)
 };
 
 /**
+ * [RecordObject description]
+ * @param {[type]} result [description]
+ */
+var RecordObject = function(result)
+{
+  var rec = result.record;
+
+  this.recid = parseInt(rec.recid[0].split(' ')[1]);
+  this.authors = rec['md-author_070'];
+  this.publishers = rec['md-author_650'];
+  this.title = rec['md-title'][0];
+  this.year = rec['md-year'][0];
+  this.holdings = [];
+
+  for (var i in rec.location) {
+    var loc = rec.location[i];
+
+    // console.log(loc);
+
+    this.holdings.push({
+      meta: {
+        id: loc.$.id,
+        name: loc.$.name,
+        checksum: loc.$.checksum
+      },
+      digital: loc['md-digital'],
+      rectype: loc['md-rectype'][0],
+      biblevel: loc['md-biblevel'][0],
+      subjects: loc['md-subject']
+    });
+  }
+
+  // console.log(rec.location);
+}
+
+/**
  * Curtain is a wrapper of the Pazpar2 package that provides
  * a simpler interface for the client to use when searching.
  *
@@ -308,7 +344,8 @@ var promiseStat = function(progress)
         parseXmlResponse(result, function(data) {
           var stat = new StatObject(data.stat);
 
-          progress(stat);
+          if (progress)
+            progress(stat);
 
           if (stat.working == 0) {
             self.statInterval.end();          
@@ -402,7 +439,7 @@ var promiseTermlist = function(terms)
  * @param  {[type]} filter [description]
  * @return {[type]}        [description]
  */
-Curtain.prototype.searchOnly = function(ccl, filter)
+Curtain.prototype.startSearch = function(ccl, filter)
 {
   var self = this;
   return q.Promise(function(resolve, reject) {
@@ -440,7 +477,7 @@ Curtain.prototype.search = function(ccl, terms, filter)
       reject(new Error('Search already in progress.'));
     }
     
-    self.searchOnly(ccl, filter)
+    self.startSearch(ccl, filter)
       .then(function() {
 
         return q.all([
@@ -473,7 +510,7 @@ Curtain.prototype.record = function(id, offset)
   var self = this;
 
   return q.Promise(function(resolve, reject) {
-    return self.pz2.record(self.session, id, offset)
+    return self.pz2.record(self.session, 'content: ' + id, offset)
       .then(function(result) {
 
         if (offset === undefined) {
@@ -491,6 +528,61 @@ Curtain.prototype.record = function(id, offset)
       }, reject);
   });
 };
+
+/**
+ * [getRecord description]
+ * @param  {[type]} id [description]
+ * @return {[type]}    [description]
+ */
+Curtain.prototype.getRecord = function(id, filter)
+{
+  var self = this;
+
+  return q.Promise(function(resolve, reject) {
+
+    // Start the search
+    self.startSearch('recid='+id, filter)
+      .then(function() {
+
+        // Stat for record existence
+        promiseStat.call(self)
+          .then(function(stat) {
+
+            if (stat.hits === 0) { // 404 record not found
+              reject({code: 404, msg: 'Record not found', session: self.session});
+            } else { // fetch record
+
+              // Query for the plain record
+              self.record(id).then(function(result) {
+
+                  // Create the record object
+                  var recordObject = new RecordObject(result);
+
+                  // Create an array of asyncronous calls to be made 
+                  // one for each location
+                  var promises = [];
+                  for (var i=0; i<recordObject.holdings.length; i++) {
+                    promises.push(self.record(id, i));
+                  }
+
+                  // Fetch marcxml from all the different locations
+                  q.all(promises).then(function(marcxml) {
+                    for (var i in marcxml) {
+                      recordObject.holdings[i].marcxml = marcxml[i].toString();
+                    }
+                    resolve(recordObject);
+                  });
+
+                }, reject);
+
+            }
+
+          }, reject);
+
+      }, reject);
+
+  });
+}
 
 /**
  * [stop description]
