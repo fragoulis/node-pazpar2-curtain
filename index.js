@@ -130,8 +130,6 @@ var RecordObject = function(result)
   for (var i in rec.location) {
     var loc = rec.location[i];
 
-    // console.log(loc);
-
     this.holdings.push({
       meta: {
         id: loc.$.id,
@@ -144,9 +142,7 @@ var RecordObject = function(result)
       subjects: loc['md-subject']
     });
   }
-
-  // console.log(rec.location);
-}
+};
 
 /**
  * Curtain is a wrapper of the Pazpar2 package that provides
@@ -517,9 +513,7 @@ Curtain.prototype.record = function(id, offset)
           parseXmlResponse(result, function(data) {
             // console.log(data);
             resolve(data);
-          }, function(code, msg) {
-            reject({code: code, msg: msg, session: self.session});
-          });
+          }, RejectCb(reject, self));
         } else {
           // console.log(result.toString());
           resolve(result);
@@ -528,6 +522,27 @@ Curtain.prototype.record = function(id, offset)
       }, reject);
   });
 };
+
+
+
+var Reject = function(reject, code, msg, session)
+{
+  var error = {
+    code: code,
+    msg: msg,
+    session: session
+  };
+
+  reject(error);
+};
+
+var RejectCb = function(reject, self)
+{
+  return function(code, msg) {
+    Reject(reject, code, msg, self.session);
+  };
+}
+
 
 /**
  * [getRecord description]
@@ -549,7 +564,8 @@ Curtain.prototype.getRecord = function(id, filter)
           .then(function(stat) {
 
             if (stat.hits === 0) { // 404 record not found
-              reject({code: Curtain.ERR_MISSING_RECORD, msg: 'Record not found', session: self.session});
+              Reject(reject, Curtain.ERR_MISSING_RECORD, 'Record not found', self.session);
+              // reject({code: Curtain.ERR_MISSING_RECORD, msg: 'Record not found', session: self.session});
             } else { // fetch record
 
               // Query for the plain record
@@ -573,13 +589,14 @@ Curtain.prototype.getRecord = function(id, filter)
                     resolve(recordObject);
                   });
 
-                }, reject);
+                }, RejectCb(reject, self));
 
             }
 
           }, reject);
 
-      }, reject);
+      }, reject)
+      .fail(reject);
 
   });
 }
