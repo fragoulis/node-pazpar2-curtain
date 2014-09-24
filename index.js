@@ -35,39 +35,51 @@ var Interval = function(interval)
 var ShowObject = function(result) 
 {
   this.status = result.status[0];
-  this.activeclients = parseInt(result.activeclients[0]);
-  this.merged = parseInt(result.merged[0]);
+  // this.activeclients = parseInt(result.activeclients[0]);
+  // this.merged = parseInt(result.merged[0]);
+  var start = parseInt(result.start[0]);
+  
   this.total = parseInt(result.total[0]);
-  this.start = parseInt(result.start[0]);
-  this.num = parseInt(result.num[0]);
-  this.hit = [];
+  this.pageSize = parseInt(result.num[0]);
+  this.pageCount = this.total === 0 ? 0 : Math.ceil(this.total / this.pageSize);
+  this.page = this.total <= this.pageSize ? 1 : (start < this.pageSize ? 1 : Math.floor(this.pageSize / start));
+  this.records = [];
 
   for(var idxHit in result.hit) {
     var newHit = {}
-      , oldHit = result.hit[idxHit];
+      , oldHit = result.hit[idxHit]
+      , loc    = oldHit.location[0]
+      ;
 
-    newHit.title = oldHit['md-title'][0];
-    newHit.author = oldHit['md-author_070'];
-    newHit.publisher = oldHit['md-author_650'];
-    newHit.year = oldHit['md-year'][0];
+    newHit.title = loc['md-title'][0];
+    newHit.authors = loc['md-author_070'];
+    newHit.publishers = loc['md-author_650'];
+    newHit.subjects = loc['md-subject'];
+    newHit.year = loc['md-year'][0];
+    newHit.recno = parseInt(loc['md-recno'][0]);
+    newHit.urls = loc['md-url'];
+
     newHit.count = parseInt(oldHit.count[0]);
-    newHit.relevance = parseInt(oldHit.relevance[0]);
+    newHit.relevance = oldHit.relevance ? parseInt(oldHit.relevance[0]) : 0;
     newHit.recid = oldHit.recid[0];
-    newHit.recno = parseInt(oldHit.location[0]['md-recno'][0]);
-    newHit.holdings = [];
 
-    for(var idxLoc in oldHit.location) {
-      var holding = {}
-        , location = oldHit.location[idxLoc];
+    newHit.source = loc.$;
 
-      holding.source = location.$.id;
-      holding.checksum = location.$.checksum;
-      holding.digital = location['md-digital'];
+    // newHit.holdings = [];
 
-      newHit.holdings.push(holding);
-    }
+    // for(var idxLoc in oldHit.location) {
+    //   var holding = {}
+    //     , location = oldHit.location[idxLoc];
 
-    this.hit.push(newHit);
+    //   holding.source = location.$.id;
+    //   holding.checksum = location.$.checksum;
+    //   holding.digital = location['md-digital'];
+
+    //   newHit.holdings.push(holding);
+    // }
+
+    // console.log(util.inspect(newHit, {showHidden: false, depth: null}));
+    this.records.push(newHit);
   }
 };
 
@@ -181,17 +193,14 @@ Curtain.ERR_INVALID_RECORD_OFFSET = 10;
  * @param  {String} result The XML response
  * @return {Object}        The JSON document
  */
-var parseXmlResponse = function(result, callback, errorCallback) 
+var parseXmlResponse = function(result, callback, reject) 
 {
   xml.parseString(result, function(err, data) 
   {
     if (err) { // XML parsing error
-      throw new Error(err);
+      reject(new Error(err));
     } else if(data.error) { // Pazpar2 error
-      console.log('Finished parsing');
-      if (errorCallback) {
-        errorCallback(parseInt(data.error.$.code), data.error.$.msg);
-      }
+      reject({code: parseInt(data.error.$.code), msg: data.error.$.msg});
     } else {
       callback(data);
     }
@@ -244,9 +253,7 @@ var innerInit = function()
         var newSession = data.init.session[0];
         self.session = newSession;
         resolve(newSession);
-      }, function(code, msg) {
-        reject({code: code, msg: msg, session: self.session});
-      });
+      }, reject);
 
     }, reject);
   });
@@ -314,9 +321,7 @@ Curtain.prototype.ping = function()
 
         var data = parseXmlResponse(result, function(data) {
           resolve(data);
-        }, function(code, msg) {
-            reject(msg);
-        });
+        }, reject);
 
       }, reject);
 
@@ -349,13 +354,9 @@ var promiseStat = function(progress)
             resolve(stat);
           }
             
-        }, function(code, msg) {
-          reject(new Error(msg));
-        });
+        }, reject);
         
-      }, function(err) {
-        reject(err);
-      });
+      }, reject).fail(reject);
 
     });
 
@@ -366,28 +367,32 @@ var promiseStat = function(progress)
  * [promiseShow description]
  * @return {[type]} [description]
  */
-var promiseShow = function() 
+var promiseShow = function(page, pageSize, sort, sortDir) 
 {
-  var self = this;
+  var self = this
+    , options = {
+        start: page <= 1 ? 0 : (page - 1) * pageSize
+      , num: pageSize
+      , sort: sort + ':' + (sortDir.toLowerCase() === 'asc' ? '1' : '0')
+    }
+    ;
+
   return q.Promise(function(resolve, reject) {
 
     self.showInterval.begin(function() {
       
-      self.pz2.show(self.session).then(function(result) {
+      self.pz2.show(self.session, options)
+        .then(function(result) {
+          // console.log(result.toString());
+          parseXmlResponse(result, function(data) {
+            if (data.show.activeclients == 0) {
+              self.showInterval.end();
+              // console.log(util.inspect(data.show, {showHidden: false, depth: null}));
+              resolve(new ShowObject(data.show));
+            }
+          }, reject);
 
-        // console.log(result.toString());
-        parseXmlResponse(result, function(data) {
-          if (data.show.activeclients == 0) {
-            self.showInterval.end();
-            resolve(new ShowObject(data.show));
-          }
-        }, function(code, msg) {
-          reject(new Error(msg));
-        });
-
-      }, function(err) {
-        reject(err);
-      });
+        }, reject).fail(reject);
 
     });
 
@@ -416,13 +421,9 @@ var promiseTermlist = function(terms)
             self.termlistInterval.end();
             resolve(new TermListObject(data));
           }
-        }, function(code, msg) {
-          reject(new Error(msg));
-        });
+        }, reject);
         
-      }, function(err) {
-        reject(err);
-      });
+      }, reject).fail(reject);
 
     });
 
@@ -465,32 +466,46 @@ Curtain.prototype.startSearch = function(ccl, filter)
  *
  * @return {Promise} [description]
  */
-Curtain.prototype.search = function(ccl, terms, filter) 
+Curtain.prototype.search = function(options, terms, filter) 
 {
-  var self = this;
+  var self = this
+    , ccl = typeof options === 'object' ? options.ccl : options
+    , page = typeof options === 'object' ? parseInt(options.page) : 1
+    , pageSize = typeof options === 'object' ? parseInt(options.pageSize) : 10
+    , sort = typeof options === 'object' ? options.sort : 'relevance'
+    , sortDir = typeof options === 'object' ? options.sortDir : 'asc'
+    , timeStarted = Date.now()
+    ;
+
   return q.Promise(function(resolve, reject, progress) {
 
     if (self.searching) {
       reject(new Error('Search already in progress.'));
     }
-    
+
     self.startSearch(ccl, filter)
       .then(function() {
 
         return q.all([
             promiseStat.call(self, progress)
-          , promiseShow.call(self)
+          , promiseShow.call(self, page, pageSize, sort, sortDir)
           , promiseTermlist.call(self, terms)
         ]).then(function(results) {
 
           self.searching = false;
+
+          results[1].time = (Date.now() - timeStarted) * 0.001;
+
+          // console.log('Curtain done searching.');
 
           resolve({
             show: results[1],
             termlist: results[2]
           });
 
-        }, reject);
+        }, reject)
+        .catch(reject)
+        .done();
 
       }, reject);
   });
@@ -510,11 +525,10 @@ Curtain.prototype.record = function(id, offset)
     return self.pz2.record(self.session, 'content: ' + id, offset)
       .then(function(result) {
 
-
         if (offset === undefined) {
           parseXmlResponse(result, function(data) {
             resolve(data);
-          }, RejectCb(reject, self));
+          }, reject);
         } else {
           resolve(result);
         }
@@ -585,8 +599,7 @@ Curtain.prototype.getRecord = function(id, filter)
                   resolve(recordObject);
                 });
 
-              }, RejectCb(reject, self));
-
+              }, reject);
             }
 
           }, reject);
