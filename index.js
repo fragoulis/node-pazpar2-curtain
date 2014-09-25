@@ -42,7 +42,7 @@ var ShowObject = function(result)
   this.total = parseInt(result.total[0]);
   this.pageSize = parseInt(result.num[0]);
   this.pageCount = this.total === 0 ? 0 : Math.ceil(this.total / this.pageSize);
-  this.page = this.total <= this.pageSize ? 1 : (start < this.pageSize ? 1 : Math.floor(this.pageSize / start));
+  this.page = this.total <= this.pageSize ? 1 : (Math.floor(start / this.pageSize) + 1);
   this.records = [];
 
   for(var idxHit in result.hit) {
@@ -388,11 +388,16 @@ var promiseShow = function(page, pageSize, sort, sortDir)
             if (data.show.activeclients == 0) {
               self.showInterval.end();
               // console.log(util.inspect(data.show, {showHidden: false, depth: null}));
-              resolve(new ShowObject(data.show));
+              
+              var obj = new ShowObject(data.show);
+              obj.sort = sort;
+              obj.sortDir = sortDir;
+              resolve(obj);
             }
           }, reject);
 
-        }, reject).fail(reject);
+        }, reject)
+        .fail(reject);
 
     });
 
@@ -414,16 +419,18 @@ var promiseTermlist = function(terms)
 
     self.termlistInterval.begin(function() {
       
-      self.pz2.termlist(self.session, terms).then(function(result) {
+      self.pz2.termlist(self.session, terms)
+        .then(function(result) {
 
-        parseXmlResponse(result, function(data) {
-          if (data.termlist.activeclients == 0) {
-            self.termlistInterval.end();
-            resolve(new TermListObject(data));
-          }
-        }, reject);
-        
-      }, reject).fail(reject);
+          parseXmlResponse(result, function(data) {
+            if (data.termlist.activeclients == 0) {
+              self.termlistInterval.end();
+              resolve(new TermListObject(data));
+            }
+          }, reject);
+          
+        }, reject).
+        fail(reject);
 
     });
 
@@ -443,7 +450,8 @@ Curtain.prototype.startSearch = function(ccl, filter)
   return q.Promise(function(resolve, reject) {
 
     self.pz2.search(self.session, ccl, filter)
-      .then(resolve, reject);
+      .then(resolve, reject)
+      .fail(reject);
 
   });
 }
@@ -504,10 +512,39 @@ Curtain.prototype.search = function(options, terms, filter)
           });
 
         }, reject)
-        .catch(reject)
-        .done();
+        .fail(reject);
 
-      }, reject);
+      }, reject)
+      .fail(reject);
+  });
+};
+
+Curtain.prototype.page = function(page, pageSize, sort, sortDir)
+{
+  var self = this
+    , options = {
+        start: page <= 1 ? 0 : (page - 1) * pageSize
+      , num: pageSize
+      , sort: sort + ':' + (sortDir.toLowerCase() === 'asc' ? '1' : '0')
+    }
+    ;
+  
+  console.log({sort:sort, sortDir:sortDir});
+
+  return q.Promise(function(resolve, reject) {
+    self.pz2.show(self.session, options)
+      .then(function(result) {
+        
+        // console.log(result.toString());
+        parseXmlResponse(result, function(data) {
+          var obj = new ShowObject(data.show);
+          obj.sort = sort;
+          obj.sortDir = sortDir;
+          resolve(obj);
+        }, reject);
+
+      }, reject)
+      .fail(reject);
   });
 };
 
