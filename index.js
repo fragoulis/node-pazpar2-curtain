@@ -40,6 +40,7 @@ var ShowObject = function(result)
   var start = parseInt(result.start[0]);
   
   this.total = parseInt(result.total[0]);
+
   this.pageSize = parseInt(result.num[0]);
   this.pageCount = this.total === 0 ? 0 : Math.ceil(this.total / this.pageSize);
   this.page = this.total <= this.pageSize ? 1 : (Math.floor(start / this.pageSize) + 1);
@@ -80,6 +81,18 @@ var ShowObject = function(result)
 
     // console.log(util.inspect(newHit, {showHidden: false, depth: null}));
     this.records.push(newHit);
+  }
+
+  /**
+   * @return {Integer} Returns the object's error code.
+   */
+  this.getErrorCode = function()
+  {
+    if (this.total > 0 && start >= this.total) { // Invalid page
+      return Curtain.ERR_SEARCH_INVALID_PAGE;
+    } else {
+      return Curtain.ERR_SEARCH_NONE;
+    }
   }
 };
 
@@ -186,6 +199,9 @@ var Curtain = function(options)
 Curtain.ERR_INVALID_SESSION = 1;
 Curtain.ERR_MISSING_RECORD  = 7;
 Curtain.ERR_INVALID_RECORD_OFFSET = 10;
+
+Curtain.ERR_SEARCH_NONE = 0;
+Curtain.ERR_SEARCH_INVALID_PAGE = 1;
 
 /**
  * Parses a pazpar2 server response and returns a JSON document.
@@ -502,11 +518,12 @@ Curtain.prototype.search = function(options, terms, filter)
 
           self.searching = false;
 
-          results[1].time = (Date.now() - timeStarted) * 0.001;
-
           // console.log('Curtain done searching.');
 
           resolve({
+            ccl: ccl,
+            time: (Date.now() - timeStarted),
+            error: results[1].getErrorCode(),
             show: results[1],
             termlist: results[2]
           });
@@ -529,8 +546,6 @@ Curtain.prototype.page = function(page, pageSize, sort, sortDir)
     }
     ;
   
-  console.log({sort:sort, sortDir:sortDir});
-
   return q.Promise(function(resolve, reject) {
     self.pz2.show(self.session, options)
       .then(function(result) {
@@ -540,6 +555,7 @@ Curtain.prototype.page = function(page, pageSize, sort, sortDir)
           var obj = new ShowObject(data.show);
           obj.sort = sort;
           obj.sortDir = sortDir;
+          obj.error = obj.getErrorCode();
           resolve(obj);
         }, reject);
 
